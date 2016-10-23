@@ -5,15 +5,46 @@
  */
 package chargebeesync;
 
+import com.chargebee.ListResult;
+import com.chargebee.models.*;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import javax.swing.SwingWorker;
+
+
 /**
  *
  * @author Vagelis
  */
-public class syncFrame extends javax.swing.JFrame {
+public class syncFrame extends javax.swing.JFrame{
+    
+    private Task task;
+    //Task so there is not much work on a single thread
+    class Task extends SwingWorker<Void, Void> {
+        /*
+         * Main task. Executed in background thread.
+         */
+        @Override
+        public Void doInBackground() {           
+            try { 
+                //Calling the method for data sync
+                sync();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }           
+            //Initialize progress property.  
+        return null;
+        }
+        
+        @Override
+        public void done() {
+            //Informs the user that sync is complete through a label
+            infoLabel.setText("Synchronization Complete!");
+            syncButton.setEnabled(true);
+        }
+    }
 
-    /**
-     * Creates new form syncFrame
-     */
     public syncFrame() {
         initComponents();
     }
@@ -28,42 +59,63 @@ public class syncFrame extends javax.swing.JFrame {
     private void initComponents() {
 
         syncButton = new javax.swing.JButton();
-        syncProgress = new javax.swing.JProgressBar();
+        infoLabel = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
         syncButton.setText("Synchronize Data");
+        syncButton.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
+        syncButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                syncButtonActionPerformed(evt);
+            }
+        });
+
+        infoLabel.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        infoLabel.setText("Data will be stored in .doc files where the project is. Please close any opened files");
+        infoLabel.setToolTipText("");
+        infoLabel.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
-                .addGap(134, 134, 134)
-                .addComponent(syncButton)
-                .addContainerGap(149, Short.MAX_VALUE))
-            .addGroup(layout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(syncProgress, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addContainerGap())
+                .addComponent(infoLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 414, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addComponent(syncButton, javax.swing.GroupLayout.PREFERRED_SIZE, 375, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
-                .addGap(55, 55, 55)
+                .addGap(70, 70, 70)
                 .addComponent(syncButton)
-                .addGap(18, 18, 18)
-                .addComponent(syncProgress, javax.swing.GroupLayout.PREFERRED_SIZE, 26, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(178, Short.MAX_VALUE))
+                .addGap(38, 38, 38)
+                .addComponent(infoLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 45, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(124, Short.MAX_VALUE))
         );
 
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
+    private void syncButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_syncButtonActionPerformed
+        //Disable button untl the task is complete
+        syncButton.setEnabled(false);
+        //Ask the user to wait for the task to complete
+        infoLabel.setText("Please wait... Synchronization in progress.");
+        task = new Task();
+        //Start the task that syncs the data
+        task.execute();
+    }//GEN-LAST:event_syncButtonActionPerformed
+
     /**
      * @param args the command line arguments
      */
-    public static void main(String args[]) {
+    public static void main(String args[]) throws IOException{
         /* Set the Nimbus look and feel */
         //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
         /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
@@ -94,9 +146,50 @@ public class syncFrame extends javax.swing.JFrame {
             }
         });
     }
-
+    
+    //Method used for the connection to the site and sync of the data
+    public void sync() throws IOException{
+        //Create a class that handles connection and files
+        ChargeBeeSync cbs = new ChargeBeeSync();
+        //Connect to site
+        cbs.connectToChargeBee();
+        //Get all the available data from ChargeBee
+        ListResult customerResult = Customer.list().request();
+        ListResult subscriptionResult = Subscription.list().request();
+        ListResult invoicesResult = Invoice.list().request();
+        ListResult creditNoteResult = CreditNote.list().request();
+        ListResult orderListResult = Order.list().request();
+        ListResult transactionsResult = Transaction.list().request();
+        ListResult plansResult = Plan.list().request();
+        ListResult addonsResult = Addon.list().request();
+        ListResult couponsResult = Coupon.list().request();
+        //Set the filenames and path for each data category
+        Path fileCustomer = Paths.get("Customers.doc");
+        Path fileSubscriptions = Paths.get("Subscriptions.doc");
+        Path fileCards = Paths.get("Cards.doc");
+        Path fileInvoices = Paths.get("Invoices.doc");
+        Path fileCreditNotes = Paths.get("CreditNotes.doc");
+        Path fileOrders = Paths.get("Orders.doc");
+        Path fileTransactions = Paths.get("Transactions.doc");
+        Path filePlans = Paths.get("Plans.doc");
+        Path fileAddons = Paths.get("Addons.doc");
+        Path fileCoupons = Paths.get("Coupons.doc");
+        Path fileAddresses = Paths.get("Adresses.doc");
+        //Write the data retrieved into created files
+        cbs.writeCustomerFile(customerResult, fileCustomer);  
+        cbs.writeSubscriptionsFile(subscriptionResult, fileSubscriptions);
+        cbs.writeCardsFile(customerResult, fileCards);
+        cbs.writeInvoicesFile(invoicesResult, fileInvoices);
+        cbs.writeCreditNotesFile(creditNoteResult, fileCreditNotes);
+        cbs.writeOrdersFile(orderListResult, fileOrders);
+        cbs.writeTransactionsFile(transactionsResult, fileTransactions);
+        cbs.writePlansFile(plansResult, filePlans);
+        cbs.writeAddonsFile(addonsResult, fileAddons);
+        cbs.writeCouponsFile(couponsResult, fileCoupons);
+        cbs.writeAddressesFile(subscriptionResult, fileAddresses);
+    }
     // Variables declaration - do not modify//GEN-BEGIN:variables
+    private javax.swing.JLabel infoLabel;
     private javax.swing.JButton syncButton;
-    private javax.swing.JProgressBar syncProgress;
     // End of variables declaration//GEN-END:variables
 }
